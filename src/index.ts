@@ -4,7 +4,7 @@ interface messageType {
     message : string
 }
 const wss = new WebSocketServer ({port :8080})
-    const AllSocket :WebSocket[]=[]
+    let AllSocket :WebSocket[]=[]
     const messages:messageType[]  = []
 wss.on("connection",function(socket){
     AllSocket.push(socket)
@@ -18,4 +18,9 @@ wss.on("connection",function(socket){
         s!.send(JSON.stringify(parsed))
        }
     })
+    socket.on("close",()=>{
+        console.log("user Disconect")
+        AllSocket = AllSocket.filter(x =>x !== socket)
+    })
+
 })
