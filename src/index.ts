@@ -1,67 +1,73 @@
-import { WebSocketServer ,WebSocket } from 'ws'
-interface messageType {
-    username : string,
-    message : string
-}
-interface User {
-    socket: WebSocket;
-    roomID :string
-}
-type ParseMessage = {
-      type: "join";
-      payload: {
-          roomID: string;
-          roomName : string;
-          username: string;
-          time: number;
-      };
-    }  | {
-      type: "chat";
-      payload: {
-        message: string; 
-        username: string;
-        time: number;
-        roomID : string;
-      };
-    };
-const wss = new WebSocketServer ({port :8080})
-const messages:messageType[]  = []
-let AllSocket :User[]=[]
-wss.on("connection",function(socket){
-    console.log("user Connected")
-    
-    socket.on("message",(data)=>{
-        const parsed :ParseMessage =JSON.parse(data.toString())
-        if(parsed.type === "join"){
-            const alreadyjoinsameroom = AllSocket.find(
-                (u)=>u.socket ===socket && u.roomID === parsed.payload.roomID )
-                if(alreadyjoinsameroom){
-                    console.log("User Aready in this room ")
-                    socket.send('You are Aready in this room')
-                    return 
-                }
-                AllSocket.push({
-                    socket,
-                    roomID :parsed.payload.roomID 
-                })
-                console.log(AllSocket.length)
-            }if(parsed.type === "chat"){
-                const isCurrectroomId = AllSocket.find(
-                    x=>x.socket  ===socket && parsed.payload.roomID === x.roomID)
-                if(!isCurrectroomId){
-                    socket.send("You are not in the room")
-                    return
-                }
-                const currentuserRoom = parsed.payload.roomID
-                console.log(` room ${currentuserRoom} `)
-                const roomSocket= AllSocket.filter((User)=> User.roomID===currentuserRoom)
+import express, { type Request } from 'express';
+import http from 'http';
+import { WebSocketServer } from 'ws';
+import { authRouter } from './routers/authrouter.js';
+import { roomRouter } from './routers/roomrouter.js';
+import { messageRouter } from './routers/messagerouter.js';
+import  url  from 'url';
+import jwt, { type JwtPayload } from 'jsonwebtoken'
 
-            roomSocket.forEach(x=> x.socket.send(JSON.stringify(parsed.payload)))
-        }
+import { JWT_PASSWORD, PORT } from './config.js';
+import type WebSocket from 'ws';
+import { wsHandler } from './wshandler.js';
+import { initDB, test } from './db.js';
+
+export interface customReqtype extends Request{
+    user?:string |JwtPayload ;
+    roomId?: string
+ }
+
+const app  = express()
+const server = http.createServer(app)
+const wss = new WebSocketServer({noServer :true})
+
+app.use(express.json())
+
+app.use("/api/auth",authRouter)
+app.use("/api/room",roomRouter)
+app.use("/api/room",messageRouter)
+
+server.on('upgrade',(req :customReqtype,socket,head)=>{
+    const{query}= url.parse(req.url ,true) 
+    const token = query.token as string;
+    const roomId = query.roomId as string;
+    if(!token || !roomId){
+        socket.write("HTTP/1.1 400 Bed Request\r\n\r\n");
+        socket.destroy()
+    }
+    try{
+        const user = jwt.verify(token,JWT_PASSWORD)
        
-    })
-    socket.on("close",()=>{
-        console.log("user Disconect")
-        AllSocket = AllSocket.filter((u) => u.socket !== socket)
-    })
+        req.user = user
+        req.roomId = roomId
+
+        wss.handleUpgrade(req,socket,head,(ws :WebSocket)=>{
+            wss.emit("connection",ws,req)
+        })
+    }catch(err){
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n")
+        socket.destroy()
+    }
 })
+
+wss.on("connection",(ws : WebSocket,req:customReqtype)=>{
+   const roomId = req.roomId 
+    ws.send(`you connect the room ${roomId} `)
+    wsHandler(ws,req,wss)
+})
+
+server.listen(PORT,()=>{
+    console.log(`server runing on ${PORT}`)
+})
+
+// async function serverStart(){
+//     try{
+//         await test()
+//         await initDB()
+//      
+//     }catch(err){
+//         console.error("error inserver start" ,err)
+//     }
+// }
+
+// serverStart()
