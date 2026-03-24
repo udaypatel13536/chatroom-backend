@@ -1,5 +1,6 @@
 import express, { type Request } from 'express';
 import http from 'http';
+
 import { WebSocketServer } from 'ws';
 import { authRouter } from './routers/authrouter.js';
 import { roomRouter } from './routers/roomrouter.js';
@@ -13,7 +14,7 @@ import { wsHandler } from './wshandler.js';
 import { initDB, test } from './db.js';
 
 export interface customReqtype extends Request{
-    user?:string |JwtPayload ;
+    user?:{ user_id: string; username: string } 
     roomId?: string
  }
 
@@ -25,7 +26,7 @@ app.use(express.json())
 
 app.use("/api/auth",authRouter)
 app.use("/api/room",roomRouter)
-app.use("/api/room",messageRouter)
+app.use("/api/messages",messageRouter)
 
 server.on('upgrade',(req :customReqtype,socket,head)=>{
     const{query}= url.parse(req.url ,true) 
@@ -36,9 +37,9 @@ server.on('upgrade',(req :customReqtype,socket,head)=>{
         socket.destroy()
     }
     try{
-        const user = jwt.verify(token,JWT_PASSWORD)
+        const decoded = jwt.verify(token,JWT_PASSWORD) as {user_id: string; username: string;}
        
-        req.user = user
+        req.user = decoded 
         req.roomId = roomId
 
         wss.handleUpgrade(req,socket,head,(ws :WebSocket)=>{
