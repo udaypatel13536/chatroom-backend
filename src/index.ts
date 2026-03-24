@@ -66,7 +66,7 @@ server.listen(PORT,()=>{
 //         await initDB()
 //      
 //     }catch(err){
-//         console.error("error inserver start" ,err)
+//         console.error("error in test DB" ,err)
 //     }
 // }
 
