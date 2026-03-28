@@ -10,12 +10,13 @@ import jwt, { type JwtPayload } from 'jsonwebtoken'
 
 import { JWT_PASSWORD, PORT } from './config.js';
 import type WebSocket from 'ws';
-import { wsHandler } from './wshandler.js';
+
 import { initDB, test } from './db.js';
+import { WSHendler } from './wshandler.js';
 
 export interface customReqtype extends Request{
     user?:{ user_id: string; username: string } 
-    roomId?: string
+
  }
 
 const app  = express()
@@ -31,8 +32,8 @@ app.use("/api/messages",messageRouter)
 server.on('upgrade',(req :customReqtype,socket,head)=>{
     const{query}= url.parse(req.url ,true) 
     const token = query.token as string;
-    const roomId = query.roomId as string;
-    if(!token || !roomId){
+
+    if(!token){
         socket.write("HTTP/1.1 400 Bed Request\r\n\r\n");
         socket.destroy()
     }
@@ -40,7 +41,7 @@ server.on('upgrade',(req :customReqtype,socket,head)=>{
         const decoded = jwt.verify(token,JWT_PASSWORD) as {user_id: string; username: string;}
        
         req.user = decoded 
-        req.roomId = roomId
+
 
         wss.handleUpgrade(req,socket,head,(ws :WebSocket)=>{
             wss.emit("connection",ws,req)
@@ -52,10 +53,10 @@ server.on('upgrade',(req :customReqtype,socket,head)=>{
 })
 
 wss.on("connection",(ws : WebSocket,req:customReqtype)=>{
-   const roomId = req.roomId 
-    ws.send(`you connect the room ${roomId} `)
-    wsHandler(ws,req,wss)
+    ws.send(`you are connected.`)
+    WSHendler(ws,req,wss)
 })
+
 
 server.listen(PORT,()=>{
     console.log(`server runing on ${PORT}`)

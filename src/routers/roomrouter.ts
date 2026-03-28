@@ -13,7 +13,7 @@ return res.json({
 })
 })
 
-roomRouter.get("/",auth,async(req:authreqtype,res)=>{
+roomRouter.get("/my",auth,async(req:authreqtype,res)=>{
  //get only join room list  $ 
  const user_id = req.user_id
  const userInAllRoom = await pool.query("SELECT rooms.* FROM rooms JOIN room_members ON rooms.room_id = room_members.room_id  WHERE room_members.member_id = $1",[user_id]) 
